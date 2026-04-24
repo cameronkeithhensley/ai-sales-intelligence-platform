@@ -2,15 +2,13 @@
 **/.terraform/
 *.tfstate
 *.tfstate.backup
-*.tfvars
+*.tfvars.local
 .terraform.lock.hcl
 
-# Secrets
-*.env
-.env*
-secrets/
-*.pem
-*.key
+# Node
+node_modules/
+dist/
+build/
 
 # Python
 __pycache__/
@@ -18,5 +16,21 @@ __pycache__/
 .venv/
 venv/
 
-# macOS
+# Secrets / env
+.env
+.env.*
+secrets/
+*.pem
+*.key
+
+# Private Claude Code context — never commit
+CLAUDE.local.md
+CLAUDE.*.local.md
+
+# Editor / OS
 .DS_Store
+.idea/
+.vscode/
+
+# Logs
+*.log
