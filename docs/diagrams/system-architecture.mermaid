@@ -1,0 +1,100 @@
+%% AI Sales Intelligence Platform — system architecture
+%% Public / demo view. Vendor names are generic; no proprietary pipeline or scoring logic shown.
+
+flowchart LR
+    subgraph Client_Layer [Client]
+        Browser[Web Browser<br/>Next.js Dashboard]
+        Messenger[Messaging Client<br/>WhatsApp / SMS / Email]
+    end
+
+    subgraph AWS_Edge [AWS Edge]
+        ALB[Application Load Balancer<br/>+ WAF + ACM TLS]
+    end
+
+    subgraph Auth
+        Cognito[Cognito User Pool<br/>OIDC · JWT · PKCE]
+    end
+
+    subgraph Services [ECS Fargate services]
+        Dashboard[Dashboard<br/>Next.js 14]
+        Butler[Holdsworth<br/>butler agent · Node.js 20]
+        MCP[Admin MCP Server<br/>Node.js 20]
+        Scout[Scout<br/>Python 3.12]
+        Harvester[Harvester<br/>Python 3.12]
+        Profiler[Profiler<br/>Python 3.12]
+        Writer[Writer<br/>Node.js 20]
+    end
+
+    subgraph Messaging [Async job plane]
+        SQS_Scout[(SQS<br/>scout-jobs + DLQ)]
+        SQS_Harv[(SQS<br/>harvester-jobs + DLQ)]
+        SQS_Prof[(SQS<br/>profiler-jobs + DLQ)]
+        SQS_Writer[(SQS<br/>writer-jobs + DLQ)]
+    end
+
+    subgraph Data [Data plane]
+        RDS[(RDS PostgreSQL<br/>+ PostGIS<br/>schema-per-tenant)]
+        Secrets[Secrets Manager]
+        S3_Bucket[S3<br/>per-tenant prefixes]
+    end
+
+    subgraph External [External integrations generic]
+        EmailProv[email delivery provider]
+        SMSProv[SMS provider]
+        CRMProv[CRM provider]
+        AdProv[ad platform API]
+        DataAPI[external data APIs<br/>property / person / reviews / OSINT]
+        Anthropic[Anthropic API<br/>Claude]
+    end
+
+    Browser --> ALB
+    Messenger --> ALB
+
+    ALB --> Dashboard
+    ALB --> Butler
+    ALB --> MCP
+
+    Cognito -.validates.-> Dashboard
+    Cognito -.validates.-> Butler
+    Cognito -.validates.-> MCP
+
+    MCP -->|enqueue| SQS_Scout
+    MCP -->|enqueue| SQS_Harv
+    MCP -->|enqueue| SQS_Prof
+    MCP -->|enqueue| SQS_Writer
+    Butler -->|enqueue| SQS_Scout
+    Butler -->|enqueue| SQS_Harv
+    Butler -->|enqueue| SQS_Prof
+    Butler -->|enqueue| SQS_Writer
+
+    SQS_Scout -->|long-poll| Scout
+    SQS_Harv -->|long-poll| Harvester
+    SQS_Prof -->|long-poll| Profiler
+    SQS_Writer -->|long-poll| Writer
+
+    Scout --> RDS
+    Harvester --> RDS
+    Profiler --> RDS
+    Writer --> RDS
+    Dashboard --> RDS
+    Butler --> RDS
+    MCP --> RDS
+
+    Scout -. secrets .-> Secrets
+    Harvester -. secrets .-> Secrets
+    Profiler -. secrets .-> Secrets
+    Writer -. secrets .-> Secrets
+    Butler -. secrets .-> Secrets
+    Dashboard -. secrets .-> Secrets
+    MCP -. secrets .-> Secrets
+
+    Dashboard --> S3_Bucket
+
+    Harvester -.-> DataAPI
+    Profiler -.-> DataAPI
+    Writer -.-> Anthropic
+    Butler -.-> Anthropic
+    Butler -.-> SMSProv
+    Butler -.-> EmailProv
+    Butler -.-> CRMProv
+    Butler -.-> AdProv
