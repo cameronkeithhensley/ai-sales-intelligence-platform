@@ -1,0 +1,22 @@
+{
+  "name": "@ai-sip/shared",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shared Node.js runtime utilities for ai-sales-intelligence-platform agent services.",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@aws-sdk/client-secrets-manager": "^3.600.0",
+    "@aws-sdk/client-sqs": "^3.600.0",
+    "aws-jwt-verify": "^4.0.1",
+    "pg": "^8.11.5",
+    "pino": "^9.0.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "vitest": "^1.6.0"
+  }
+}

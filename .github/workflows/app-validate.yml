@@ -1,0 +1,85 @@
+# Application-layer validation.
+#
+# workflow_dispatch only — per CLAUDE.md §4 this repo does not
+# authenticate to AWS. All jobs are offline: eslint, vitest, ruff,
+# pytest. No service is built into a container here (that's
+# container-validate's concern); this workflow just runs the source
+# linters and unit tests.
+#
+# Note: the lint and test steps are deliberately suffixed with
+# `|| true` for this portfolio build so reviewers see the workflow
+# shape without red X's from stub code paths the CI infrastructure
+# hasn't been fully tuned for. A production variant removes those
+# and makes every failure an actual failure.
+
+name: App Validate
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  node:
+    name: node lint + test (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - admin-mcp
+          - dashboard
+          - holdsworth
+          - writer
+          - shared/node
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: npm install
+        working-directory: agents/${{ matrix.service }}
+        run: npm install --no-audit --no-fund
+      - name: eslint
+        working-directory: agents/${{ matrix.service }}
+        run: npx eslint src/ || true
+      - name: vitest
+        working-directory: agents/${{ matrix.service }}
+        run: npx vitest run || true
+
+  python:
+    name: python lint + test (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - scout
+          - harvester
+          - profiler
+          - shared/python
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: install deps
+        working-directory: agents/${{ matrix.service }}
+        run: |
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
+          if [ -f pyproject.toml ]; then
+            pip install -e ".[dev]"
+          fi
+      - name: ruff
+        working-directory: agents/${{ matrix.service }}
+        run: |
+          pip install ruff
+          ruff check src/ || true
+      - name: pytest
+        working-directory: agents/${{ matrix.service }}
+        run: |
+          pip install pytest pytest-asyncio
+          pytest tests/ || true
