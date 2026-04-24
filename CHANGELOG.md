@@ -2,6 +2,28 @@
 
 All notable changes to this repository are documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Sprint 3] - 2026-04-24 — Agent scaffolding + MCP surface
+
+### Added
+- `agents/shared/{node,python}/` — runtime utilities implementing the four-part contract (pool + tenant routing, Cognito JWT, SQS consumer with visibility heartbeat, structured logging + redaction) once per runtime. 16 vitest tests + 22 pytest tests passing locally.
+- `agents/shared/schema.json` — JSON Schema (draft 2020-12) for the SQS job envelope shared by every producer/consumer pair.
+- `agents/admin-mcp/` — Express-mounted MCP server with six Zod-validated tool signatures (`dispatch_scout` / `dispatch_harvester` / `dispatch_profiler`, `write_outreach`, `get_job_status`, `get_signals`) and stub handlers. Every invocation writes a `public.audit_log` row.
+- `agents/dashboard/` — Next.js 14 app-router skeleton with NextAuth wired to the Cognito provider, a portfolio-labelled landing page, and a custom Node server that preserves the Sprint 2 `/healthz` on 8080 contract.
+- `agents/holdsworth/` — Express HTTP server with an HMAC-SHA256-verified `/webhooks/sms`, a JWT-guarded `/agent/message`, a heartbeat-only `scheduler.js` (deliberately named, *not* `cron.js`), and a ReAct-shaped agent-loop skeleton. Tools include `generate-message-draft` (no prompt content) and `record-outreach-event`.
+- `agents/writer/` — SQS consumer wired to `@anthropic-ai/sdk`. The processor sends the sentinel string `[PROMPT CONTENT EXCLUDED FROM PUBLIC REPO]` on every call; a unit test asserts the sentinel remains unchanged so any future leak would fail CI.
+- `agents/scout/` — asyncio Python SQS consumer with a generic `httpx` + BeautifulSoup `fetch` stub. No per-source extractors, no domain-specific selectors, no headless-browser automation.
+- `agents/harvester/` — Python SQS consumer whose `adapters/__init__.py` ships a `DataAdapter` Protocol + an empty `REGISTRY` + `register`/`resolve`/`unregister` helpers. `resolve()` raises a `KeyError` whose message explicitly labels adapter implementations as proprietary.
+- `agents/profiler/` — passive-DNS-only recon dispatcher with a hard-coded safe allowlist (`dns_lookup`, `whois`, `mx_records`). Unsafe tool names raise `ValueError`.
+- `.github/workflows/app-validate.yml` — eslint + vitest across the Node services, ruff + pytest across the Python services. `workflow_dispatch` only.
+
+### Safety
+- Every file on the CLAUDE.md §2 IP denylist remains excluded (confirmed via forbidden-filename sweep).
+- Writer contains no prompt content; the placeholder sentinel is the exact string an audit test asserts against.
+- Harvester contains no adapter implementations — Protocol + empty registry only; the `adapters/README.md` states this explicitly.
+- Holdsworth has no file named `cron.js`; the heartbeat stub is `scheduler.js` with an in-file comment noting scheduling / orchestration is proprietary.
+- No workflow uses `aws-actions/configure-aws-credentials`.
+- No references to any vendor name in the CLAUDE.local.md scrub list.
+
 ## [Sprint 2] - 2026-04-24 — Agent container infrastructure
 
 ### Added
