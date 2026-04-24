@@ -14,7 +14,7 @@
 
 ## Files changed
 
-<!-- Paste a summary — e.g. "Added CLAUDE.md, LICENSE, ARCHITECTURE.md; replaced README.md; …" -->
+<!-- Paste a summary — e.g. "Added LICENSE, ARCHITECTURE.md; replaced README.md; …" -->
 
 ## Validation commands run
 
@@ -29,9 +29,9 @@ tflint --recursive terraform/
 ## Manual review checklist
 
 ### IP-leak check
-- [ ] No file from the CLAUDE.md IP denylist was read, copied, or paraphrased.
+- [ ] No file from the IP denylist (see `CLAUDE.md` §2 and `CLAUDE.local.md`) was read, copied, or paraphrased.
 - [ ] No proprietary signal-type names, pipeline-pass sequencing, scoring rules, or prompt content appear in the diff.
-- [ ] No real vendor names from the scrub table appear (Twilio, Instantly.ai, PDL, ATTOM, Apollo, Hunter, SignalHire, Lusha, Shodan, theHarvester, Facebook/Google Ads, HubSpot/Salesforce/Pipedrive, Yelp/Google Places, Stripe).
+- [ ] No private vendor names appear — all third-party providers use the generic labels from `CLAUDE.md` §3.
 - [ ] No real customer data, emails, phone numbers, or person names (other than "Cameron Hensley" in author lines).
 
 ### AWS non-execution safeguards
@@ -42,9 +42,7 @@ tflint --recursive terraform/
 - [ ] Any `terraform plan` demonstration uses `terraform init -backend=false`.
 
 ### Scrub check
-- [ ] Account id `429260466248` → `000000000000` everywhere.
-- [ ] `intentsignaler.com` (and subdomains) → `example.com`.
-- [ ] Secrets Manager paths `/intent-signaler/...` → `/example-app/...`.
+- [ ] Every private identifier (account ID, domain, secrets path, database name) has been replaced with its public placeholder per `CLAUDE.md` §3 and `CLAUDE.local.md`.
 
 ## Notes for the reviewer
 

@@ -9,7 +9,7 @@
 - **PostgreSQL** on AWS RDS.
 - **PostGIS** extension for geographic queries on tenant-scoped data.
 - `pgcrypto` for `gen_random_uuid()`.
-- Single logical database per environment (`intent_signaler` in the live system; any name is fine here).
+- Single logical database per environment. Any name is fine for the demo.
 
 ---
 

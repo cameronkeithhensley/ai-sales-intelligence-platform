@@ -1,8 +1,8 @@
 # CLAUDE.md — Ground rules for Claude Code sessions in this repo
 
-This is a **public portfolio repository**. It showcases multi-tenant AWS / Terraform / CI-CD patterns drawn from a private production SaaS ("Intent Signaler"). The private source lives at `/Users/cameronhensley/Documents/intent-signaler/intent-signaler/` and is the **read-only source of truth** — nothing proprietary may leak into this repo.
+This is a **public portfolio repository**. It showcases multi-tenant AWS / Terraform / CI-CD patterns drawn from a private production SaaS. A separate, gitignored file — `CLAUDE.local.md` — holds the concrete private values (account IDs, domains, vendor names, absolute paths) referenced by the scrub rules below. Claude Code sessions in this repo must load **both** files.
 
-Every future session in this repo must load these rules before making changes.
+If `CLAUDE.local.md` is missing, treat every candidate value as "scrub unless explicitly safe" and ask the operator rather than guessing.
 
 ---
 
@@ -16,29 +16,21 @@ Every future session in this repo must load these rules before making changes.
 
 ## 2. IP denylist — never read, copy, reference, or paraphrase
 
-Treat these paths (in the private repo) as if they do not exist:
+Treat these categories of files in the private source tree as if they do not exist:
 
-- `agents/holdsworth/src/cron.js`
-- `agents/holdsworth/src/quota-manager.js`
-- `agents/holdsworth/src/scoring.js` (and any `scoring.*`)
-- `agents/holdsworth/src/contact-selector.js`
-- `agents/holdsworth/src/context-dossier.js`
-- `agents/holdsworth/src/feature-flags.js`
-- `agents/holdsworth/src/pipeline-status.js`
-- `agents/holdsworth/src/decision-maker.js`
-- `agents/holdsworth/src/email-discovery*`
-- `agents/holdsworth/src/neighbor-discovery*`
-- `agents/holdsworth/src/homeowner-enrichment*`
-- `agents/writer/src/prompts/*` and any file containing system prompts, tone matrices, or template strings
-- `agents/harvester/src/adapters/*` — all API adapter implementations. The registry / index file may be referenced **structurally only** (its existence, not its contents).
-- `agents/*/src/business-categories.json`
-- `agents/*/src/lead-pipeline-rules.json`
-- `lambda/cost-aggregator/src/*` — implementation logic
-- Any file containing signal-type catalogs or strength weights
-- Any `.env` or `.env.*` file
-- Anything containing real customer data, non-public tenant schemas, or API keys
+- Orchestration and scheduling logic (cron, quota, pipeline sequencing, feature flags, pipeline status).
+- Scoring, ranking, decision-maker, and contact-selection logic.
+- Any OSINT / contact / neighbor / homeowner discovery or enrichment module.
+- All LLM prompts, tone matrices, and outreach templates.
+- All third-party API adapter implementations. The registry / index file may be referenced **structurally only** (its existence, not its contents).
+- All signal-type catalogs, strength weights, business-category or pipeline-rule JSON.
+- All cost-aggregator implementation logic.
+- Any `.env` or `.env.*` file.
+- Anything containing customer data, non-public tenant schemas, or API keys.
 
-**If a file's purpose is unclear, skip it.** Do not read speculatively. A file that is denylist-adjacent (for example, sibling of a scoring file) should be treated as denylisted until confirmed safe.
+The concrete file paths matching these categories live in `CLAUDE.local.md`.
+
+**If a file's purpose is unclear, skip it.** Do not read speculatively. Denylist-adjacent files should be treated as denylisted until confirmed safe.
 
 ---
 
@@ -48,28 +40,32 @@ Apply these substitutions to any value that makes it into this repo (commit mess
 
 ### Identifiers
 
-| Private value | Public replacement |
+| Category | Public replacement |
 |---|---|
-| AWS account ID `429260466248` | `000000000000` |
-| `intentsignaler.com` and subdomains (e.g. `dev-dashboard.intentsignaler.com`) | `example.com` |
-| Secrets Manager paths `/intent-signaler/...` | `/example-app/...` |
+| AWS account IDs | `000000000000` |
+| Real domains and subdomains | `example.com` (or `dev.example.com`, `staging.example.com`) |
+| Secrets Manager path prefixes | `/example-app/...` |
 | Real emails, phone numbers, person names | removed or generic (`user@example.com`, `+10000000000`) |
 | **Exception:** "Cameron Hensley" is permitted in author, copyright, and footer lines. |
 
+The actual private identifier values that must be scrubbed are listed in `CLAUDE.local.md`.
+
 ### Vendor names → generic labels
 
-| Private value | Public replacement |
+| Category | Public replacement |
 |---|---|
-| Twilio | SMS provider |
-| Instantly.ai | email delivery provider |
-| People Data Labs / PDL | person-data API |
-| ATTOM | property-data API |
-| Apollo / Hunter / SignalHire / Lusha | contact enrichment provider |
-| Shodan / theHarvester | OSINT passive recon tool |
-| Facebook Marketing API / Google Ads API | ad platform API |
-| HubSpot / Salesforce / Pipedrive | CRM provider |
-| Yelp / Google Places | review platform API |
-| Stripe | payment provider |
+| SMS / voice provider | SMS provider |
+| Bulk email delivery provider | email delivery provider |
+| Person-data / people-search API | person-data API |
+| Property / parcel / real-estate API | property-data API |
+| Contact email / phone enrichment provider | contact enrichment provider |
+| Passive OSINT / recon tool | OSINT passive recon tool |
+| Paid social / search ad platform | ad platform API |
+| Sales CRM | CRM provider |
+| Review / local listing platform | review platform API |
+| Payment processor | payment provider |
+
+The actual vendor names that map into each category are listed in `CLAUDE.local.md`.
 
 ### Keep explicit (these are industry-standard, non-proprietary)
 
@@ -96,7 +92,7 @@ A change that weakens any safeguard above requires explicit approval from Camero
 
 - All work happens on a sprint branch (e.g. `sprint-0-foundation`, `sprint-1-terraform`).
 - Claude opens a PR to `main`; Cameron reviews and merges. Claude does **not** merge.
-- Commits are split by logical unit (docs, license, terraform module, workflow, etc.) — not squashed.
+- Commits are split by logical unit (docs, license, terraform module, workflow, etc.) — not squashed at commit time.
 - The sprint plan is:
   - Sprint 0 — repository foundation (this sprint)
   - Sprint 1 — Terraform foundation (modules, environments, non-executing plan workflow)
@@ -109,7 +105,7 @@ A change that weakens any safeguard above requires explicit approval from Camero
 
 Before every commit, verify:
 
-1. No `429260466248`, no `intentsignaler.com`, no real vendor names from the scrub table above.
+1. No values from the `CLAUDE.local.md` scrub tables appear anywhere in the staged diff.
 2. No file from the IP denylist is referenced, copied, or paraphrased.
 3. No `aws-actions/configure-aws-credentials` in any workflow.
 4. All `backend.tf` blocks are commented or absent.
