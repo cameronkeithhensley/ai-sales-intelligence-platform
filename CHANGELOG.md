@@ -2,6 +2,21 @@
 
 All notable changes to this repository are documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Sprint 2] - 2026-04-24 — Agent container infrastructure
+
+### Added
+- Terraform modules: `ecs-cluster`, `ecs-service`, `waf`, `guardduty`, `ses`, `s3` — each with `main.tf`, `variables.tf`, `outputs.tf`, `versions.tf`, and a portfolio-grade `README.md`.
+- Seven ECS services wired in `dev`: three load-balanced (`dashboard`, `holdsworth`, `admin-mcp`) behind the public ALB via host-based listener rules, and four workers (`scout`, `harvester`, `profiler`, `writer`).
+- Dockerfiles and minimal stub entry points for all seven services. Node.js services (`dashboard`, `holdsworth`, `admin-mcp`, `writer`) use multi-stage `node:20-alpine`; Python services (`scout`, `harvester`, `profiler`) use `python:3.12-slim` (profiler uses `kalilinux/kali-rolling` for its passive OSINT toolchain).
+- `migrations/` with four public-schema SQL migrations (`tenants`, `jobs`, `audit_log`, `outreach_events`) plus a README explaining the public-only scope and the bastion-based application path.
+- Second CI workflow (`.github/workflows/container-validate.yml`) — hadolint matrix over all seven Dockerfiles plus a Trivy filesystem scan, gated on `workflow_dispatch` only.
+
+### Safety
+- No workflow uses `aws-actions/configure-aws-credentials`.
+- Every task definition image reference uses the scrubbed account-id ECR URL via `module.ecr.repository_urls[...]`.
+- Dockerfiles run as non-root; no vendor SDKs (SMS / email / CRM / people-data / OSINT) are referenced by name in `package.json` / `requirements.txt` / env vars.
+- Only the four public-schema tables are in `migrations/` — per-tenant schema DDL remains proprietary and is not in this repo.
+
 ## [Sprint 1] - 2026-04-23 — Terraform foundation
 
 ### Added
