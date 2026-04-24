@@ -77,3 +77,75 @@ output "bastion_instance_id" {
   description = "EC2 instance ID of the bastion. Use with: aws ssm start-session --target <id>."
   value       = module.bastion.instance_id
 }
+
+# --- Agent services layer (Sprint 2) --------------------------------------
+
+output "ecs_cluster_arn" {
+  description = "ARN of the dev ECS cluster that hosts every agent service."
+  value       = module.ecs_cluster.cluster_arn
+}
+
+output "ecs_cluster_name" {
+  description = "Name of the dev ECS cluster."
+  value       = module.ecs_cluster.cluster_name
+}
+
+output "service_target_group_arns" {
+  description = "Map of load-balanced service name -> ALB target group ARN. Useful for wiring CloudWatch alarms to request counts / 5xx rates."
+  value = {
+    dashboard  = module.ecs_service_dashboard.target_group_arn
+    holdsworth = module.ecs_service_holdsworth.target_group_arn
+    admin-mcp  = module.ecs_service_admin_mcp.target_group_arn
+  }
+}
+
+output "service_task_role_arns" {
+  description = "Map of service name -> task role ARN. Additional policies can be attached to these via aws_iam_role_policy_attachment elsewhere."
+  value = {
+    dashboard  = module.ecs_service_dashboard.task_role_arn
+    holdsworth = module.ecs_service_holdsworth.task_role_arn
+    admin-mcp  = module.ecs_service_admin_mcp.task_role_arn
+    scout      = module.ecs_service_scout.task_role_arn
+    harvester  = module.ecs_service_harvester.task_role_arn
+    profiler   = module.ecs_service_profiler.task_role_arn
+    writer     = module.ecs_service_writer.task_role_arn
+  }
+}
+
+output "service_security_group_ids" {
+  description = "Map of service name -> ENI security group id. Add these as sources on RDS / ElastiCache SGs to admit the service."
+  value = {
+    dashboard  = module.ecs_service_dashboard.security_group_id
+    holdsworth = module.ecs_service_holdsworth.security_group_id
+    admin-mcp  = module.ecs_service_admin_mcp.security_group_id
+    scout      = module.ecs_service_scout.security_group_id
+    harvester  = module.ecs_service_harvester.security_group_id
+    profiler   = module.ecs_service_profiler.security_group_id
+    writer     = module.ecs_service_writer.security_group_id
+  }
+}
+
+output "waf_web_acl_arn" {
+  description = "ARN of the WAF web ACL attached to the public ALB."
+  value       = module.waf.web_acl_arn
+}
+
+output "guardduty_detector_id" {
+  description = "GuardDuty detector id for the dev account/region."
+  value       = module.guardduty.detector_id
+}
+
+output "ses_configuration_set_name" {
+  description = "SES configuration set name. Applications must pass this on every send to get reputation metrics + event publishing."
+  value       = module.ses.configuration_set_name
+}
+
+output "ses_dkim_tokens" {
+  description = "SES DKIM tokens. Publish as CNAME records in the domain's DNS; this repo does not manage DNS."
+  value       = module.ses.dkim_tokens
+}
+
+output "s3_artifacts_bucket_arn" {
+  description = "ARN of the per-environment S3 artifacts bucket."
+  value       = module.s3_artifacts.bucket_arn
+}

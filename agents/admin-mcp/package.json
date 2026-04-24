@@ -1,0 +1,17 @@
+{
+  "name": "admin-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-sqs": "^3.600.0",
+    "@aws-sdk/client-secrets-manager": "^3.600.0",
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "pg": "^8.11.5",
+    "express": "^4.19.2",
+    "pino": "^9.0.0"
+  }
+}
