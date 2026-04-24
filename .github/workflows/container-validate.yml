@@ -1,0 +1,50 @@
+# Offline container and filesystem validation.
+#
+# workflow_dispatch only — per CLAUDE.md section 4, this repo does not
+# authenticate to AWS and does not build or push images. hadolint lints
+# each Dockerfile; trivy scans the filesystem for known-vulnerable
+# dependencies and misconfigurations. No image pulls, no registry auth,
+# no AWS credentials.
+
+name: Container Validate
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  hadolint:
+    name: hadolint (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - admin-mcp
+          - dashboard
+          - harvester
+          - holdsworth
+          - profiler
+          - scout
+          - writer
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: agents/${{ matrix.service }}/Dockerfile
+          failure-threshold: warning
+
+  trivy-fs:
+    name: trivy (filesystem)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          exit-code: '0'
+          format: table
