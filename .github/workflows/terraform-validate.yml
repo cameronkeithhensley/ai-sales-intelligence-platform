@@ -1,0 +1,80 @@
+# Offline Terraform validation.
+#
+# This workflow is intentionally `workflow_dispatch` only (no `push` or
+# `pull_request` triggers) per CLAUDE.md section 4: this is a public
+# portfolio repository and must be structurally incapable of calling AWS.
+# No job assumes an AWS role or configures AWS credentials. Every job runs
+# static analysis only:
+#
+#   - `terraform fmt -check -recursive` — formatting
+#   - `terraform init -backend=false` + `terraform validate` — schema / wiring
+#   - `tflint --recursive` — lint + AWS-specific best-practice rules
+#   - `checkov` — security / misconfiguration scan (soft-fail so findings
+#     surface as SARIF without blocking the job)
+#
+# To enable on every PR later, the gate in CLAUDE.md section 4 would need to
+# explicitly allow it. Until then, invoke manually from the Actions tab.
+
+name: Terraform Validate
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fmt:
+    name: terraform fmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ~1.6
+      - run: terraform fmt -check -recursive terraform/
+
+  validate:
+    name: terraform validate (${{ matrix.environment }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        environment: [dev]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ~1.6
+      - name: init (offline, no backend)
+        run: terraform -chdir=terraform/environments/${{ matrix.environment }} init -backend=false
+      - name: validate
+        run: terraform -chdir=terraform/environments/${{ matrix.environment }} validate
+
+  tflint:
+    name: tflint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: latest
+      - name: tflint --init
+        run: tflint --init
+        env:
+          # Avoids GitHub API rate limits when fetching the AWS ruleset.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: tflint --recursive
+        run: tflint --chdir=terraform --recursive --config=$GITHUB_WORKSPACE/.tflint.hcl
+
+  checkov:
+    name: checkov (soft-fail)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: bridgecrewio/checkov-action@master
+        with:
+          directory: terraform/
+          framework: terraform
+          soft_fail: true
+          output_format: cli,sarif
+          output_file_path: console,checkov.sarif
