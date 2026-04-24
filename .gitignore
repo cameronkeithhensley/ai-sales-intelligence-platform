@@ -9,6 +9,10 @@
 node_modules/
 dist/
 build/
+# Portfolio repo: services aren't deployed from these lockfiles and
+# committing them bloats diffs with machine-generated content.
+package-lock.json
+.next/
 
 # Python
 __pycache__/
