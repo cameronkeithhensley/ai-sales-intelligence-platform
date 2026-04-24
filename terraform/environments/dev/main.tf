@@ -36,7 +36,29 @@ locals {
     "writer",
     "holdsworth",
     "admin-mcp",
+    "dashboard",
   ]
+
+  # Image tag applied to every task definition this sprint. Sprint 3 will
+  # replace this with a pipeline-supplied git-sha tag.
+  image_tag = "placeholder-sprint-2"
+
+  # Per-service task sizing. Dev uses the Fargate-minimum shape across the
+  # board; Sprint 2 is concerned with shape, not scale.
+  task_sizing = {
+    dashboard  = { cpu = 256, memory = 512 }
+    holdsworth = { cpu = 256, memory = 512 }
+    admin-mcp  = { cpu = 256, memory = 512 }
+    writer     = { cpu = 256, memory = 512 }
+    scout      = { cpu = 256, memory = 512 }
+    harvester  = { cpu = 256, memory = 512 }
+    profiler   = { cpu = 512, memory = 1024 }
+  }
+
+  # ECR image URLs pinned to image_tag, keyed by service name.
+  service_image_urls = {
+    for svc in local.ecr_repositories : svc => "${module.ecr.repository_urls[svc]}:${local.image_tag}"
+  }
 
   secrets = {
     db-master-password            = "Master password for the application RDS instance."
@@ -150,6 +172,277 @@ module "cognito" {
   logout_urls = [
     "https://${var.domain_name}/",
   ]
+
+  tags = local.common_tags
+}
+
+# --- Agent services layer (Sprint 2) --------------------------------------
+
+module "ecs_cluster" {
+  source = "../../modules/ecs-cluster"
+
+  name        = "${var.environment}-agents"
+  environment = var.environment
+
+  tags = local.common_tags
+}
+
+# ---- Load-balanced services ----
+
+module "ecs_service_dashboard" {
+  source = "../../modules/ecs-service"
+
+  service_name   = "dashboard"
+  environment    = var.environment
+  cluster_id     = module.ecs_cluster.cluster_id
+  image_url      = local.service_image_urls["dashboard"]
+  container_port = 8080
+  cpu            = local.task_sizing["dashboard"].cpu
+  memory         = local.task_sizing["dashboard"].memory
+  desired_count  = 1
+
+  vpc_id             = module.vpc.vpc_id
+  private_subnet_ids = module.vpc.private_subnet_ids
+
+  secret_arns = {
+    DATABASE_URL    = module.secrets.secret_arns["db-master-password"]
+    JWT_SIGNING_KEY = module.secrets.secret_arns["jwt-signing-key"]
+  }
+
+  env_vars = {
+    NODE_ENV                    = "production"
+    COGNITO_USER_POOL_ID        = module.cognito.user_pool_id
+    COGNITO_USER_POOL_CLIENT_ID = module.cognito.user_pool_client_id
+  }
+
+  load_balancer_enabled  = true
+  alb_https_listener_arn = module.alb.https_listener_arn
+  alb_security_group_id  = module.alb.security_group_id
+  host_header            = "dashboard.${var.domain_name}"
+  listener_rule_priority = 100
+  health_check_path      = "/healthz"
+
+  tags = local.common_tags
+}
+
+module "ecs_service_holdsworth" {
+  source = "../../modules/ecs-service"
+
+  service_name   = "holdsworth"
+  environment    = var.environment
+  cluster_id     = module.ecs_cluster.cluster_id
+  image_url      = local.service_image_urls["holdsworth"]
+  container_port = 8080
+  cpu            = local.task_sizing["holdsworth"].cpu
+  memory         = local.task_sizing["holdsworth"].memory
+  desired_count  = 1
+
+  vpc_id             = module.vpc.vpc_id
+  private_subnet_ids = module.vpc.private_subnet_ids
+
+  secret_arns = {
+    DATABASE_URL                  = module.secrets.secret_arns["db-master-password"]
+    JWT_SIGNING_KEY               = module.secrets.secret_arns["jwt-signing-key"]
+    SMS_PROVIDER_TOKEN            = module.secrets.secret_arns["sms-provider-token"]
+    EMAIL_DELIVERY_PROVIDER_TOKEN = module.secrets.secret_arns["email-delivery-provider-token"]
+  }
+
+  env_vars = {
+    NODE_ENV = "production"
+  }
+
+  load_balancer_enabled  = true
+  alb_https_listener_arn = module.alb.https_listener_arn
+  alb_security_group_id  = module.alb.security_group_id
+  host_header            = "butler.${var.domain_name}"
+  listener_rule_priority = 200
+  health_check_path      = "/healthz"
+
+  tags = local.common_tags
+}
+
+module "ecs_service_admin_mcp" {
+  source = "../../modules/ecs-service"
+
+  service_name   = "admin-mcp"
+  environment    = var.environment
+  cluster_id     = module.ecs_cluster.cluster_id
+  image_url      = local.service_image_urls["admin-mcp"]
+  container_port = 8080
+  cpu            = local.task_sizing["admin-mcp"].cpu
+  memory         = local.task_sizing["admin-mcp"].memory
+  desired_count  = 1
+
+  vpc_id             = module.vpc.vpc_id
+  private_subnet_ids = module.vpc.private_subnet_ids
+
+  secret_arns = {
+    DATABASE_URL    = module.secrets.secret_arns["db-master-password"]
+    JWT_SIGNING_KEY = module.secrets.secret_arns["jwt-signing-key"]
+  }
+
+  env_vars = {
+    NODE_ENV = "production"
+  }
+
+  load_balancer_enabled  = true
+  alb_https_listener_arn = module.alb.https_listener_arn
+  alb_security_group_id  = module.alb.security_group_id
+  host_header            = "admin.${var.domain_name}"
+  listener_rule_priority = 300
+  health_check_path      = "/healthz"
+
+  tags = local.common_tags
+}
+
+# ---- Worker services ----
+
+module "ecs_service_scout" {
+  source = "../../modules/ecs-service"
+
+  service_name  = "scout"
+  environment   = var.environment
+  cluster_id    = module.ecs_cluster.cluster_id
+  image_url     = local.service_image_urls["scout"]
+  cpu           = local.task_sizing["scout"].cpu
+  memory        = local.task_sizing["scout"].memory
+  desired_count = 1
+
+  vpc_id             = module.vpc.vpc_id
+  private_subnet_ids = module.vpc.private_subnet_ids
+
+  secret_arns = {
+    DATABASE_URL = module.secrets.secret_arns["db-master-password"]
+  }
+
+  env_vars = {
+    QUEUE_URL = module.sqs.queue_urls["scout-jobs"]
+  }
+
+  load_balancer_enabled = false
+
+  tags = local.common_tags
+}
+
+module "ecs_service_harvester" {
+  source = "../../modules/ecs-service"
+
+  service_name  = "harvester"
+  environment   = var.environment
+  cluster_id    = module.ecs_cluster.cluster_id
+  image_url     = local.service_image_urls["harvester"]
+  cpu           = local.task_sizing["harvester"].cpu
+  memory        = local.task_sizing["harvester"].memory
+  desired_count = 1
+
+  vpc_id             = module.vpc.vpc_id
+  private_subnet_ids = module.vpc.private_subnet_ids
+
+  secret_arns = {
+    DATABASE_URL = module.secrets.secret_arns["db-master-password"]
+  }
+
+  env_vars = {
+    QUEUE_URL = module.sqs.queue_urls["harvester-jobs"]
+  }
+
+  load_balancer_enabled = false
+
+  tags = local.common_tags
+}
+
+module "ecs_service_profiler" {
+  source = "../../modules/ecs-service"
+
+  service_name  = "profiler"
+  environment   = var.environment
+  cluster_id    = module.ecs_cluster.cluster_id
+  image_url     = local.service_image_urls["profiler"]
+  cpu           = local.task_sizing["profiler"].cpu
+  memory        = local.task_sizing["profiler"].memory
+  desired_count = 1
+
+  vpc_id             = module.vpc.vpc_id
+  private_subnet_ids = module.vpc.private_subnet_ids
+
+  secret_arns = {
+    DATABASE_URL        = module.secrets.secret_arns["db-master-password"]
+    PERSON_DATA_API_KEY = module.secrets.secret_arns["person-data-api-key"]
+  }
+
+  env_vars = {
+    QUEUE_URL = module.sqs.queue_urls["profiler-jobs"]
+  }
+
+  load_balancer_enabled = false
+
+  tags = local.common_tags
+}
+
+module "ecs_service_writer" {
+  source = "../../modules/ecs-service"
+
+  service_name  = "writer"
+  environment   = var.environment
+  cluster_id    = module.ecs_cluster.cluster_id
+  image_url     = local.service_image_urls["writer"]
+  cpu           = local.task_sizing["writer"].cpu
+  memory        = local.task_sizing["writer"].memory
+  desired_count = 1
+
+  vpc_id             = module.vpc.vpc_id
+  private_subnet_ids = module.vpc.private_subnet_ids
+
+  secret_arns = {
+    DATABASE_URL      = module.secrets.secret_arns["db-master-password"]
+    JWT_SIGNING_KEY   = module.secrets.secret_arns["jwt-signing-key"]
+    ANTHROPIC_API_KEY = module.secrets.secret_arns["anthropic-api-key"]
+  }
+
+  env_vars = {
+    NODE_ENV  = "production"
+    QUEUE_URL = module.sqs.queue_urls["writer-jobs"]
+  }
+
+  load_balancer_enabled = false
+
+  tags = local.common_tags
+}
+
+# ---- Security services ----
+
+module "waf" {
+  source = "../../modules/waf"
+
+  name        = "alb"
+  environment = var.environment
+  alb_arn     = module.alb.alb_arn
+
+  tags = local.common_tags
+}
+
+module "guardduty" {
+  source = "../../modules/guardduty"
+
+  environment = var.environment
+
+  tags = local.common_tags
+}
+
+module "ses" {
+  source = "../../modules/ses"
+
+  domain_name = var.domain_name
+  environment = var.environment
+
+  tags = local.common_tags
+}
+
+module "s3_artifacts" {
+  source = "../../modules/s3"
+
+  bucket_name = "${var.environment}-app-artifacts"
+  environment = var.environment
 
   tags = local.common_tags
 }
